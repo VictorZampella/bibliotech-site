@@ -181,6 +181,17 @@ async function apiRequest(path, options = {}) {
   return { data, response };
 }
 
+async function apiEstaAcessivel() {
+  try {
+    const resposta = await fetch(`${apiBase}/api/livros?page=0&size=1`, {
+      headers: { Accept: 'application/hal+json, application/json' }
+    });
+    return resposta.ok;
+  } catch {
+    return false;
+  }
+}
+
 async function carregarLista(resourceKey = activeResource, termo = '', page = currentPage) {
   const config = resources[resourceKey];
   ui.loadingState.hidden = false;
@@ -218,10 +229,20 @@ async function carregarLista(resourceKey = activeResource, termo = '', page = cu
       ui.emptyCreateButton.hidden = true;
     } else if (error.status) {
       setApiStatus(true, error.status === 429 ? 'API conectada · limite atingido' : 'API respondeu com erro');
+    } else if (await apiEstaAcessivel()) {
+      setApiStatus(true, authKey ? 'API conectada · confira sua chave' : 'API conectada · login necessário');
+      ui.emptyTitle.textContent = authKey ? 'Não foi possível carregar esta lista' : 'Entre para consultar este cadastro';
+      ui.emptyCopy.textContent = authKey
+        ? 'A API está online, mas não foi possível concluir esta consulta. Confira sua chave e tente novamente.'
+        : `A API está online. Entre com sua conta para consultar ${config.title.toLocaleLowerCase('pt-BR')}.`;
+      ui.emptyCreateButton.hidden = true;
+      showToast(authKey
+        ? 'A API está online, mas não foi possível validar a chave desta consulta.'
+        : `A API está online. Entre para consultar ${config.title.toLocaleLowerCase('pt-BR')}.`, Boolean(authKey));
     } else {
       setApiStatus(false, 'Falha ao conectar');
+      showToast(error.message, true);
     }
-    showToast(error.message, true);
   } finally {
     ui.loadingState.hidden = true;
   }
